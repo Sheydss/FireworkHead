@@ -1,0 +1,63 @@
+{
+    "hash": "de395fd691447d87655d973695fe62282bfdf4989921c4ba438b95e1eb82c2f7",
+    "name":"Exemple TopTir",
+    "tops":
+        [
+            {
+                "id":1,
+                "timeInTenths":30,
+                "alert":false,
+                "separatorBefore":false
+            },
+            {
+                "id":2,
+                "timeInTenths":180,
+                "alert":false,
+                "separatorBefore":false
+            },
+            {
+                "id":3,
+                "timeInTenths":340,
+                "alert":true,
+                "separatorBefore":false
+            },
+            {
+                "id":4,
+                "timeInTenths":390,
+                "alert":false,
+                "separatorBefore":false
+            },
+            {
+                "id":5,
+                "timeInTenths":450,
+                "alert":false,
+                "separatorBefore":false
+            },
+            {
+                "id":6,
+                "timeInTenths":500,
+                "alert":true,
+                "separatorBefore":true
+            },
+            {
+                "id":7,
+                "timeInTenths":530,
+                "alert":false,
+                "separatorBefore":false
+            },
+            {
+                "id":8,
+                "timeInTenths":550,
+                "alert":false,
+                "separatorBefore":false
+            },
+            {
+                "id":9,
+                "timeInTenths":620,
+                "alert":false,
+                "separatorBefore":false
+            }
+        ],
+    "audioFilePath":"demo TopTir.mp3",
+    "audioTotalDuration":70295
+}
