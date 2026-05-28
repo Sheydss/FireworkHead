@@ -125,7 +125,7 @@ bool RS485Node::readFrame(RS485Frame& frame, uint32_t timeoutMs)
             continue;
 
         const uint8_t b = static_cast<uint8_t>(m_serial.read());
-        Serial.printf("[readFrame] RX byte: 0x%02X (STX=0x%02X)\n", b, RS485_STX);
+        //Serial.printf("[readFrame] RX byte: 0x%02X (STX=0x%02X)\n", b, RS485_STX);
 
         if (b == RS485_STX)
         {
@@ -140,7 +140,7 @@ bool RS485Node::readFrame(RS485Frame& frame, uint32_t timeoutMs)
         return false;
     }
 
-    Serial.println("[readFrame] STX found");
+    //Serial.println("[readFrame] STX found");
 
     const uint32_t innerTimeoutMs = max(timeoutMs, static_cast<uint32_t>(200));
     const uint32_t innerDeadline  = millis() + innerTimeoutMs;
@@ -153,9 +153,9 @@ bool RS485Node::readFrame(RS485Frame& frame, uint32_t timeoutMs)
         return false;
     }
 
-    Serial.printf("[readFrame] Header: dst=0x%02X src=0x%02X len=%u\n",
-                  header[0], header[1],
-                  (static_cast<uint16_t>(header[2]) << 8) | header[3]);
+    //Serial.printf("[readFrame] Header: dst=0x%02X src=0x%02X len=%u\n",
+                  //header[0], header[1],
+                  //(static_cast<uint16_t>(header[2]) << 8) | header[3]);
 
     frame.dst        = header[0];
     frame.src        = header[1];
@@ -208,7 +208,7 @@ bool RS485Node::readFrame(RS485Frame& frame, uint32_t timeoutMs)
         return false;
     }
 
-    Serial.println("[readFrame] Frame OK");
+    //Serial.println("[readFrame] Frame OK");
     frame.valid = true;
     return true;
 }

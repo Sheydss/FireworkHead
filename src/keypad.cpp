@@ -51,7 +51,7 @@ void Keypad::update() {
           _tft.fillRoundRect(DEL_X - DEL_W/2, DEL_Y - DEL_H/2, DEL_W, DEL_H, 6, COL_DEL);
           _tft.setTextDatum(MC_DATUM);
           _tft.setTextColor(COL_KEY_TXT, COL_DEL);
-          _tft.drawString("Del", DEL_X, DEL_Y);
+          _tft.drawString("<", DEL_X, DEL_Y);
         } else {
           _keys[_pressedIdx].drawButton(false);
         }
@@ -85,7 +85,7 @@ void Keypad::update() {
         _tft.setFreeFont(FONT_KEY);
         _tft.setTextDatum(MC_DATUM);
         _tft.setTextColor(TFT_WHITE, COL_DEL_PR);
-        _tft.drawString("Del", DEL_X, DEL_Y);
+        _tft.drawString("<", DEL_X, DEL_Y);
         _deleteDigit();
 
       } else {
@@ -158,7 +158,7 @@ void Keypad::_drawUI() {
     _tft.setFreeFont(FONT_KEY); _keys[10].drawButton(); }
 
   // DEL button
-  { char lbl[] = "Del";
+  { char lbl[] = "<";
     _keys[11].initButton(&_tft, DEL_X, DEL_Y, DEL_W, DEL_H,
       COL_DEL, COL_DEL, COL_KEY_TXT, lbl, 1);
     _tft.setFreeFont(FONT_KEY); _keys[11].drawButton(); }

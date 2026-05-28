@@ -1,5 +1,6 @@
 #include "RS485Master.h"
 #include <esp_mac.h>  // esp_read_mac()
+#include <LittleFS.h>
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Constructor / lifecycle
@@ -130,6 +131,85 @@ int32_t RS485Master::ping(uint8_t dstAddr)
     const uint32_t t0 = millis();
     const bool     ok = sendCommand(dstAddr, CMD_PING, RS485_TIMEOUT_MS);
     return ok ? static_cast<int32_t>(millis() - t0) : -1;
+}
+
+// state
+
+State RS485Master::getCurrentState() {
+    return m_currentState;
+}
+
+bool RS485Master::sendState(uint8_t dstAddr, State state) {
+    Serial.printf("Sending State %d to %d\n", state, dstAddr);
+    
+    JsonDocument doc;
+    doc["cmd"] = CMD_SEND_STATE;
+    doc["state"] = state;
+    if (state == State::Play)
+    {
+        if (m_currentFileName.isEmpty())
+            return false;
+        doc["filename"] = m_currentFileName;
+    }
+    
+    const uint32_t t0 = millis();
+    const bool ok = sendCommand(dstAddr, doc, RS485_TIMEOUT_MS);
+    return ok;
+}
+
+void RS485Master::broadcastState(State state)
+{
+    JsonDocument doc;
+    doc["cmd"]   = CMD_SEND_STATE;
+    doc["state"] = static_cast<int>(state);
+
+    if (state == State::Play)
+    {
+        if (m_currentFileName.isEmpty())
+        {
+            Serial.println("[Master] broadcastState: no file set for Play");
+            return;
+        }
+        doc["filename"] = m_currentFileName;
+    }
+
+    String json;
+    serializeJson(doc, json);
+
+    // Send to broadcast address — no ACK expected, no timeout wait
+    sendFrame(RS485_BROADCAST,
+              RS485_MASTER_ADDR,
+              reinterpret_cast<const uint8_t*>(json.c_str()),
+              static_cast<uint16_t>(json.length()));
+
+    Serial.printf("[Master] Broadcast state=%d to all nodes\n",
+                  static_cast<int>(state));
+}
+
+State RS485Master::addToCurrentState(int addition) {
+  int intState = m_currentState;
+  if(intState + addition >= 0 && intState + addition <= 5) {
+    m_currentState = static_cast<State>(intState + addition);
+    broadcastState(m_currentState);
+  }
+  return m_currentState;
+}
+
+void RS485Master::setCurrentState(State state) {
+  m_currentState = state;
+  broadcastState(m_currentState);
+}
+
+
+
+// fileName
+
+String RS485Master::getCurrentFileName() {
+    return m_currentFileName;
+}
+
+void RS485Master::setCurrentFileName(String fileName) {
+    m_currentFileName = fileName;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -327,6 +407,8 @@ void RS485Master::handleHello(const RS485Frame& frame, JsonDocument& doc)
 
     Serial.printf("[Master] Welcomed MAC=%s  assigned id=0x%02X\n",
                   mac, assignedId);
+
+    sendState(assignedId, m_currentState);
 }
 
 void RS485Master::handleGoodbye(const RS485Frame& frame, JsonDocument& doc)

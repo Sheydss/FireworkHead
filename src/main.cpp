@@ -1,27 +1,25 @@
 #include <Arduino.h>
-//#include <TFT_eSPI.h>
+#include <FS.h>
+#include <LittleFS.h>
+#include <TFT_eSPI.h>
 //#include "Keypad.h"
 #include "json.h"
 #include "HT_SSD1306Wire.h"
 #include "RS485Master.h"
-#include <FS.h>
-#include <LittleFS.h>
 #include "FileSyncMaster.h"
 
 
 #define useKeypad   false
+#define BUTTON_PIN 0  // physical PROG button
 
-//TFT_eSPI tft = TFT_eSPI();
+TFT_eSPI tft = TFT_eSPI();
 //Keypad   keypad(tft);
 JsonDocument doc;
-static SSD1306Wire display(0x3C, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED);
-//static constexpr uint8_t SLAVE_2 = 0x02;
- 
-RS485Master master(Serial1, /*TX*/48, /*RX*/47, /*DE*/5, /*baud*/115200, /*heartbeat*/5000);
+static SSD1306Wire display(0x3C, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED); 
+RS485Master master(Serial1, /*TX*/1, /*RX*/2, /*DE*/5, /*baud*/115200, /*heartbeat*/5000);
 FileSyncMaster fileSync(master, "/plans");
 
-// Small test payload
-static const uint8_t TEST_FILE[] = "Hello from Heltec! This is a test file.";
+bool lastButtonState = HIGH;
 
 void VextON() { pinMode(Vext, OUTPUT); digitalWrite(Vext, LOW); }
 
@@ -35,39 +33,40 @@ void setUpOled() {
   display.display();
 }
 
-void displayOled(String text) {
+void displayOled(String text, String text2 = "") {
   display.clear();
   display.drawString(0, 0, text);
+  if(text2 != "")
+    display.drawString(0, 10, text2);
   display.display();
 }
 
 void setup() {
   Serial.begin(115200);
-  //tft.begin();
+  tft.begin();
   delay(2000);
   setUpOled();
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 
   displayOled("Master starting...");
 
-  if (!LittleFS.begin(true)) // true = format if mount fails
+  if (!LittleFS.begin(false)) // true = format if mount fails
   {
       Serial.println("[FS] Mount failed!");
       return;
   }
   Serial.println("[FS] LittleFS mounted");
 
-  //tft.setRotation(0);
+  tft.setRotation(0);
   //if(useKeypad) keypad.begin();
+
+  tft.drawString("Hello World", 0, 0);
 
   // ── Registry callbacks ────────────────────────────────────────────────────
   master.registry().onNodeJoined([](const SlaveNode& node)
   {
       Serial.printf("[App] Node JOINED  id=0x%02X  MAC=%s\n",
                     node.id, node.mac);
-
-      // Example: send a file as soon as a node comes online
-      // master.sendFile(node.id, "config.bin", TEST_FILE,
-      //                 sizeof(TEST_FILE) - 1);
   });
 
   master.registry().onNodeLost([](const SlaveNode& node)
@@ -85,7 +84,7 @@ void setup() {
   master.begin();
   delay(1000);
 
-  displayOled("Master started !");
+  master.setCurrentFileName("Exemple TopTir.json");
 
   // sync.begin() must be called AFTER master.begin()
   fileSync.begin();
@@ -99,34 +98,8 @@ void setup() {
       Serial.println("[App] Created test plan1.json");
   }
 
+  displayOled(String(master.getCurrentState()), master.getCurrentFileName());
 
-  // // ── Ping both slaves ──────────────────────────────────────────────────────
-  // for (const uint8_t addr : { SLAVE_1 })
-  // {
-  //     const int32_t rtt = master.ping(addr);
-  //     if (rtt >= 0)
-  //         Serial.printf("[Ping] slave 0x%02X → %d ms\n", addr, rtt);
-  //     else
-  //         Serial.printf("[Ping] slave 0x%02X → no response\n", addr);
-  // }
-
-  // // ── Custom command ────────────────────────────────────────────────────────
-  // {
-  //     JsonDocument doc;
-  //     doc["cmd"]   = "set_led";
-  //     doc["color"] = "blue";
-  //     doc["blink"] = true;
-  //     master.sendCommand(SLAVE_1, doc);
-  // }
-
-  // displayOled("File transfert starting ...");
-  // // ── File transfer ─────────────────────────────────────────────────────────
-  // master.sendFile(SLAVE_1,
-  //                 "test.txt",
-  //                 TEST_FILE,
-  //                 sizeof(TEST_FILE) - 1, // exclude null terminator
-  //                 64);                   // 64-byte chunks
-  // displayOled("File transfert ended");
 } 
 
 void loop() {
@@ -140,6 +113,18 @@ void loop() {
   //   }
   // }
   
+  // --- Physical button ---
+  bool currentButtonState = digitalRead(BUTTON_PIN);
+  if (currentButtonState == LOW && lastButtonState == HIGH) {
+    if(master.getCurrentState() == State::Fin) {
+      master.setCurrentState(State::Preparation);
+    }
+    else {
+      master.addToCurrentState(1);
+    }
+    displayOled(String(master.getCurrentState()), master.getCurrentFileName());
+  }
+  lastButtonState = currentButtonState;
   master.update();
 
   // ── Example: push a new plan to all nodes when 'p' is typed in Serial ─────

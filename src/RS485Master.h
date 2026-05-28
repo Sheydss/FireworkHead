@@ -2,6 +2,7 @@
 
 #include "RS485Node.h"
 #include "NodeRegistry.h"
+#include "State.h"
 
 #include <functional>
 
@@ -46,8 +47,8 @@ public:
     /// @param heartbeatIntervalMs  How often to ping all active nodes (ms).
     ///                             Set to 0 to disable automatic heartbeat.
     explicit RS485Master(HardwareSerial& serial              = Serial1,
-                         uint8_t         pinTx               = 48,
-                         uint8_t         pinRx               = 47,
+                         uint8_t         pinTx               = 1,
+                         uint8_t         pinRx               = 2,
                          uint8_t         pinDE               = 5,
                          uint32_t        baud                = 115200,
                          uint32_t        heartbeatIntervalMs = 5000);
@@ -87,6 +88,16 @@ public:
     /// Send a PING and return the round-trip time in ms, or -1 on timeout.
     int32_t ping(uint8_t dstAddr);
 
+    State getCurrentState();
+    void setCurrentState(State state);
+    State addToCurrentState(int addition);
+    bool sendState(uint8_t dstAddr, State state);
+    //void sendAllState(State state);
+    void broadcastState(State state);
+    
+    String getCurrentFileName();
+    void setCurrentFileName(String fileName);
+
     /// Transfer a binary blob to @p dstAddr in CRC-verified chunks.
     /// @param chunkSize  Raw bytes per chunk before base64 encoding.
     /// @return true when the slave confirms the complete file.
@@ -119,7 +130,9 @@ private:
     OnError      m_onError;
     OnCommand    m_onCommand;
     JsonDocument m_lastDoc;
-
+    State m_currentState = State::Preparation;
+    String m_currentFileName = "";
+    
     uint32_t m_heartbeatIntervalMs;
     uint32_t m_lastHeartbeatMs = 0;
 };
