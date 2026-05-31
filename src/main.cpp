@@ -7,7 +7,7 @@
 #include "HT_SSD1306Wire.h"
 #include "RS485Master.h"
 #include "FileSyncMaster.h"
-
+#include "EspNowHead.h"
 
 #define useKeypad   false
 #define BUTTON_PIN 0  // physical PROG button
@@ -18,6 +18,7 @@ JsonDocument doc;
 static SSD1306Wire display(0x3C, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED); 
 RS485Master master(Serial1, /*TX*/1, /*RX*/2, /*DE*/5, /*baud*/115200, /*heartbeat*/5000);
 FileSyncMaster fileSync(master, "/plans");
+EspNowHead     espNow(master);
 
 bool lastButtonState = HIGH;
 
@@ -81,13 +82,19 @@ void setup() {
       Serial.printf("[App] Error → 0x%02X : %s\n", dst, reason);
   });
 
+  master.onStateChanged([]()
+  {
+      displayOled(String(master.getCurrentState()), master.getCurrentFileName());
+  });
+
   master.begin();
   delay(1000);
 
-  master.setCurrentFileName("Exemple TopTir.json");
+  //master.setCurrentFileName("Exemple TopTir.json");
 
-  // sync.begin() must be called AFTER master.begin()
   fileSync.begin();
+
+  espNow.begin();
 
   // ── Example: write a test plan file so there is something to sync ─────────
   if (!LittleFS.exists("/plans/plan1.json"))
@@ -97,9 +104,7 @@ void setup() {
       f.close();
       Serial.println("[App] Created test plan1.json");
   }
-
-  displayOled(String(master.getCurrentState()), master.getCurrentFileName());
-
+  displayOled("Master Started");
 } 
 
 void loop() {
@@ -114,18 +119,19 @@ void loop() {
   // }
   
   // --- Physical button ---
-  bool currentButtonState = digitalRead(BUTTON_PIN);
-  if (currentButtonState == LOW && lastButtonState == HIGH) {
-    if(master.getCurrentState() == State::Fin) {
-      master.setCurrentState(State::Preparation);
-    }
-    else {
-      master.addToCurrentState(1);
-    }
-    displayOled(String(master.getCurrentState()), master.getCurrentFileName());
-  }
-  lastButtonState = currentButtonState;
+  // bool currentButtonState = digitalRead(BUTTON_PIN);
+  // if (currentButtonState == LOW && lastButtonState == HIGH) {
+  //   if(master.getCurrentState() == State::Fin) {
+  //     master.setCurrentState(State::Preparation);
+  //   }
+  //   else {
+  //     master.addToCurrentState(1);
+  //   }
+  //   displayOled(String(master.getCurrentState()), master.getCurrentFileName());
+  // }
+  // lastButtonState = currentButtonState;
   master.update();
+  espNow.update();
 
   // ── Example: push a new plan to all nodes when 'p' is typed in Serial ─────
   if (Serial.available() && Serial.read() == 'p')

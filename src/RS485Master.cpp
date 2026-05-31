@@ -32,6 +32,8 @@ void RS485Master::begin()
 void RS485Master::onError  (OnError   callback) { m_onError   = callback; }
 void RS485Master::onCommand(OnCommand callback) { m_onCommand = callback; }
 
+void RS485Master::onStateChanged(OnStateChanged cb) { m_onStateChanged = cb; }
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Registry access
 // ─────────────────────────────────────────────────────────────────────────────
@@ -197,10 +199,11 @@ State RS485Master::addToCurrentState(int addition) {
 
 void RS485Master::setCurrentState(State state) {
   m_currentState = state;
+  Serial.println("setCurrentState");
   broadcastState(m_currentState);
+  if(m_onStateChanged)
+            m_onStateChanged();
 }
-
-
 
 // fileName
 

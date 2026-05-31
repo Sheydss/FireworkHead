@@ -42,6 +42,8 @@ public:
                                          const char* cmd,
                                          JsonDocument& doc)>;
 
+    using OnStateChanged = std::function<void()>;
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     /// @param heartbeatIntervalMs  How often to ping all active nodes (ms).
@@ -65,6 +67,8 @@ public:
     // ── Callback registration ─────────────────────────────────────────────────
     void onError  (OnError   callback);
     void onCommand(OnCommand callback);
+    
+    void onStateChanged(OnStateChanged callback);
 
     // ── Node registry (read/write access) ────────────────────────────────────
 
@@ -129,6 +133,7 @@ private:
     NodeRegistry m_registry;
     OnError      m_onError;
     OnCommand    m_onCommand;
+    OnStateChanged m_onStateChanged;
     JsonDocument m_lastDoc;
     State m_currentState = State::Preparation;
     String m_currentFileName = "";
