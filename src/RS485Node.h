@@ -54,12 +54,8 @@ protected:
     /// @return true when a valid frame has been written into @p frame.
     bool readFrame(RS485Frame& frame, uint32_t timeoutMs);
 
-    // ── Base-64 helpers (shared by master encoder and slave decoder) ──────────
-    static String  base64Encode(const uint8_t* data, size_t len);
-    static size_t  base64Decode(const char*    src,
-                                size_t         srcLen,
-                                uint8_t*       dst,
-                                size_t         dstMax);
+    // ── Base-64 helpers ───────────────────────────────────────────────────────
+    // Use rs485Base64Encode / rs485Base64Decode from RS485Protocol.h directly
 
     // ── Members ───────────────────────────────────────────────────────────────
     HardwareSerial& m_serial;
@@ -71,6 +67,4 @@ protected:
 private:
     /// Read exactly @p n bytes before @p deadline (ms).
     bool readBytes(uint8_t* buf, size_t n, uint32_t deadline);
-
-    static const char k_b64Chars[65]; ///< Encoding alphabet
 };

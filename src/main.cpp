@@ -18,7 +18,7 @@ JsonDocument doc;
 static SSD1306Wire display(0x3C, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED); 
 RS485Master master(Serial1, /*TX*/1, /*RX*/2, /*DE*/5, /*baud*/115200, /*heartbeat*/5000);
 FileSyncMaster fileSync(master, "/plans");
-EspNowHead     espNow(master);
+EspNowHead     espNow(master, fileSync);
 
 bool lastButtonState = HIGH;
 
@@ -95,16 +95,10 @@ void setup() {
   fileSync.begin();
 
   espNow.begin();
-
-  // ── Example: write a test plan file so there is something to sync ─────────
-  if (!LittleFS.exists("/plans/plan1.json"))
-  {
-      File f = LittleFS.open("/plans/plan1.json", "w", true);
-      f.print(R"({"hash":"a3f1c9b2","plan_name":"Show 1","shots":[]})");
-      f.close();
-      Serial.println("[App] Created test plan1.json");
-  }
+  
   displayOled("Master Started");
+
+  master.setCurrentState(State::Preparation);
 } 
 
 void loop() {

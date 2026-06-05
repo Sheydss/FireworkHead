@@ -102,6 +102,8 @@ public:
     String getCurrentFileName();
     void setCurrentFileName(String fileName);
 
+    bool Jump(int timeInTenth)
+
     /// Transfer a binary blob to @p dstAddr in CRC-verified chunks.
     /// @param chunkSize  Raw bytes per chunk before base64 encoding.
     /// @return true when the slave confirms the complete file.
@@ -140,4 +142,8 @@ private:
     
     uint32_t m_heartbeatIntervalMs;
     uint32_t m_lastHeartbeatMs = 0;
+
+    bool     m_pendingState     = false;
+    uint8_t  m_pendingStateAddr = 0;
+    uint32_t m_pendingStateMs   = 0;
 };

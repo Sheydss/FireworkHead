@@ -53,13 +53,19 @@ void RS485Master::update()
     RS485Frame frame;
     if (readFrame(frame, 50))
         dispatchFrame(frame);
-
+    
     // ── 2. Periodic heartbeat ─────────────────────────────────────────────────
     if (m_heartbeatIntervalMs > 0 &&
         millis() - m_lastHeartbeatMs >= m_heartbeatIntervalMs)
     {
         runHeartbeat();
         m_lastHeartbeatMs = millis();
+    }
+
+    if (m_pendingState && millis() >= m_pendingStateMs)
+    {
+        m_pendingState = false;
+        sendState(m_pendingStateAddr, m_currentState);
     }
 }
 
@@ -215,6 +221,25 @@ void RS485Master::setCurrentFileName(String fileName) {
     m_currentFileName = fileName;
 }
 
+// jump
+
+bool RS485Master::Jump(int timeInTenth) {
+    JsonDocument doc;
+    doc["cmd"] = CMD_JUMP;
+    doc["timeInTenth"] = timeInTenth;
+
+    String json;
+    serializeJson(doc, json);
+
+    // Send to broadcast address — no ACK expected, no timeout wait
+    sendFrame(RS485_BROADCAST,
+              RS485_MASTER_ADDR,
+              reinterpret_cast<const uint8_t*>(json.c_str()),
+              static_cast<uint16_t>(json.length()));
+
+    Serial.printf("[Master] Broadcast jump=%d to all nodes\n", timeInTenth);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  sendFile
 // ─────────────────────────────────────────────────────────────────────────────
@@ -248,7 +273,7 @@ bool RS485Master::sendFile(uint8_t        dstAddr,
     {
         const size_t   offset    = i * chunkSize;
         const size_t   thisChunk = min(chunkSize, dataLen - offset);
-        const String   b64       = base64Encode(data + offset, thisChunk);
+        const String   b64       = rs485Base64Encode(data + offset, thisChunk);
         const uint16_t crc       = rs485ComputeCRC(data + offset, thisChunk);
 
         JsonDocument doc;
@@ -410,8 +435,10 @@ void RS485Master::handleHello(const RS485Frame& frame, JsonDocument& doc)
 
     Serial.printf("[Master] Welcomed MAC=%s  assigned id=0x%02X\n",
                   mac, assignedId);
-
-    sendState(assignedId, m_currentState);
+                  
+    m_pendingState     = true;
+    m_pendingStateAddr = assignedId;
+    m_pendingStateMs   = millis() + 500;
 }
 
 void RS485Master::handleGoodbye(const RS485Frame& frame, JsonDocument& doc)

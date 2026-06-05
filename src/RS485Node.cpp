@@ -1,13 +1,6 @@
 #include "RS485Node.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Static look-up tables
-// ─────────────────────────────────────────────────────────────────────────────
-
-const char RS485Node::k_b64Chars[65] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-// ─────────────────────────────────────────────────────────────────────────────
 //  Constructor / begin
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -208,7 +201,7 @@ bool RS485Node::readFrame(RS485Frame& frame, uint32_t timeoutMs)
         return false;
     }
 
-    //Serial.println("[readFrame] Frame OK");
+    Serial.println("[readFrame] Frame OK");
     frame.valid = true;
     return true;
 }
@@ -228,74 +221,7 @@ bool RS485Node::readBytes(uint8_t* buf, size_t n, uint32_t deadline)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Base-64 helpers
+//  Base-64 — delegated to free functions in RS485Protocol.h
 // ─────────────────────────────────────────────────────────────────────────────
-
-String RS485Node::base64Encode(const uint8_t* data, size_t len)
-{
-    String out;
-    out.reserve(((len + 2) / 3) * 4 + 1);
-
-    for (size_t i = 0; i < len; i += 3)
-    {
-        const uint32_t b =   (static_cast<uint32_t>(data[i])             << 16)
-                           | (i + 1 < len ? static_cast<uint32_t>(data[i + 1]) << 8 : 0)
-                           | (i + 2 < len ? static_cast<uint32_t>(data[i + 2])     : 0);
-
-        out += k_b64Chars[(b >> 18) & 0x3F];
-        out += k_b64Chars[(b >> 12) & 0x3F];
-        out += (i + 1 < len) ? k_b64Chars[(b >> 6) & 0x3F] : '=';
-        out += (i + 2 < len) ? k_b64Chars[ b        & 0x3F] : '=';
-    }
-    return out;
-}
-
-size_t RS485Node::base64Decode(const char* src,
-                               size_t      srcLen,
-                               uint8_t*    dst,
-                               size_t      dstMax)
-{
-    // Helper lambda: look up one base64 character, return 0xFF if invalid
-    auto lookup = [](char c) -> uint8_t {
-        if (c >= 'A' && c <= 'Z') return static_cast<uint8_t>(c - 'A');
-        if (c >= 'a' && c <= 'z') return static_cast<uint8_t>(c - 'a' + 26);
-        if (c >= '0' && c <= '9') return static_cast<uint8_t>(c - '0' + 52);
-        if (c == '+') return 62;
-        if (c == '/') return 63;
-        return 0xFF; // padding '=' or invalid
-    };
-
-    size_t out = 0;
-
-    // Process groups of 4 base64 characters → up to 3 decoded bytes
-    //
-    //  ┌── 6 bits ──┬── 6 bits ──┬── 6 bits ──┬── 6 bits ──┐
-    //  │     a      │     b      │     c      │     d      │
-    //  └─────┬──────┴──┬─────────┴──────┬─────┴────────────┘
-    //        │  byte1  │    byte2       │    byte3         │
-    //   [a7..a2|a1a0 b5..b0] [b3..b0 c5..c2] [c1c0 d5..d0]
-    //
-    //  byte1 = (a << 2) | (b >> 4)
-    //  byte2 = ((b & 0x0F) << 4) | (c >> 2)
-    //  byte3 = ((c & 0x03) << 6) | d
-
-    for (size_t i = 0; i + 4 <= srcLen && out < dstMax; i += 4)
-    {
-        const uint8_t a = lookup(src[i]);
-        const uint8_t b = lookup(src[i + 1]);
-        const uint8_t c = lookup(src[i + 2]);
-        const uint8_t d = lookup(src[i + 3]);
-
-        if (a == 0xFF || b == 0xFF)
-            break; // invalid input
-
-        dst[out++] = static_cast<uint8_t>((a << 2) | (b >> 4));
-
-        if (src[i + 2] != '=' && out < dstMax)
-            dst[out++] = static_cast<uint8_t>(((b & 0x0F) << 4) | (c >> 2));
-
-        if (src[i + 3] != '=' && out < dstMax)
-            dst[out++] = static_cast<uint8_t>(((c & 0x03) << 6) | d);
-    }
-    return out;
-}
+// base64Encode and base64Decode have been removed from RS485Node.
+// Use rs485Base64Encode() and rs485Base64Decode() from RS485Protocol.h directly.

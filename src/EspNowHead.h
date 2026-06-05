@@ -6,6 +6,8 @@
 #include <esp_wifi.h>
 #include <WiFi.h>
 #include "RS485Master.h"
+#include "FileSyncMaster.h"
+#include "RS485Protocol.h"  // for rs485ComputeCRC
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  EspNowHead
@@ -13,71 +15,83 @@
 //  Handles ESP-NOW communication between the Heltec head and the WROOM bridge.
 //
 //  Responsibilities:
-//    - Announce itself to the bridge on boot and periodically
-//    - Receive state changes from the bridge and apply them via RS485Master
-//    - Send status updates back to the bridge
-//
-//  The bridge sends:
-//    {"cmd":"set_state","state":2,"filename":"plan1.json"}
-//
-//  The head announces itself with:
-//    {"type":"announce","mac":"AA:BB:CC:DD:EE:FF"}
-//
-//  The head sends status with:
-//    {"type":"status","mac":"AA:BB:CC:DD:EE:FF","state":2}
-//
-//  Usage
-//    EspNowHead espNow(master);
-//    espNow.begin();
-//
-//    // In loop():
-//    espNow.update();
+//    - Announce itself periodically
+//    - Receive and apply state changes via RS485Master
+//    - Receive files chunk by chunk, save to /plans/, trigger RS485 sync
+//    - Respond to file list requests
+//    - Delete files and trigger RS485 sync
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Must match bridge firmware
 static constexpr uint8_t  ESPNOW_CHANNEL       = 1;
-
-// How often to re-announce to the bridge (ms)
 static constexpr uint32_t ANNOUNCE_INTERVAL_MS = 10000;
-
-// How often to send status updates (ms)
 static constexpr uint32_t STATUS_INTERVAL_MS   = 2000;
 
 class EspNowHead
 {
 public:
-    /// @param master  Reference to the RS485Master instance
-    explicit EspNowHead(RS485Master& master);
+    /// @param master    RS485Master instance
+    /// @param fileSync  FileSyncMaster instance (for triggering RS485 sync)
+    EspNowHead(RS485Master& master, FileSyncMaster& fileSync);
 
-    /// Initialise WiFi and ESP-NOW, send first announce.
-    /// Call once in setup() after master.begin().
     void begin();
-
-    /// Re-announce and send status updates periodically.
-    /// Call every loop().
     void update();
 
 private:
-    // ── ESP-NOW helpers ───────────────────────────────────────────────────────
+    // ── Outgoing ──────────────────────────────────────────────────────────────
     void sendAnnounce();
     void sendStatus();
-    void handleReceivedFrame(const uint8_t* mac, const uint8_t* data, int len);
-    void ensureBridgePeer   (const uint8_t* mac);
+    void sendFileList();
+    void sendAck   (const char* type, bool success);
+    void sendAckIdx(const char* type, uint16_t idx, bool success);
 
-    // ── Static ESP-NOW callbacks ──────────────────────────────────────────────
+    // ── Incoming ──────────────────────────────────────────────────────────────
+    void handleReceivedFrame(const uint8_t* mac,
+                             const uint8_t* data, int len);
+    void handleFileStart (JsonDocument& doc);
+    void handleFileChunk (const uint8_t* mac, JsonDocument& doc);
+    void handleFileEnd   (const uint8_t* mac, JsonDocument& doc);
+    void handleFileDelete(const uint8_t* mac, JsonDocument& doc);
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    void   ensureBridgePeer(const uint8_t* mac);
+    // base64 and CRC use shared free functions from RS485Protocol.h
+
+    // ── Static callbacks ──────────────────────────────────────────────────────
     static void onSent    (const uint8_t* mac, esp_now_send_status_t status);
     static void onReceived(const uint8_t* mac, const uint8_t* data, int len);
 
-    // ── Members ───────────────────────────────────────────────────────────────
-    RS485Master& m_master;
+    // ── File transfer state ───────────────────────────────────────────────────
+    struct FileTransferState
+    {
+        bool     active      = false;
+        char     name[64]    = {};
+        size_t   totalSize   = 0;
+        uint16_t totalChunks = 0;
+        uint16_t nextChunk   = 0;
+        uint8_t* buf         = nullptr;
+        size_t   received    = 0;
 
-    char    m_mac[18]       = {}; ///< Own MAC as "AA:BB:CC:DD:EE:FF"
-    uint8_t m_bridgeMac[6]  = {}; ///< Bridge MAC (learned on first receive)
-    bool    m_bridgeKnown   = false;
+        void reset()
+        {
+            active = false;
+            name[0] = '\0';
+            totalSize = received = nextChunk = totalChunks = 0;
+            if (buf) { free(buf); buf = nullptr; }
+        }
+    };
+
+    // ── Members ───────────────────────────────────────────────────────────────
+    RS485Master&    m_master;
+    FileSyncMaster& m_fileSync;
+
+    char     m_mac[18]      = {};
+    uint8_t  m_bridgeMac[6] = {};
+    bool     m_bridgeKnown  = false;
 
     uint32_t m_lastAnnounceMs = 0;
     uint32_t m_lastStatusMs   = 0;
 
-    // Static pointer for callbacks — only one EspNowHead instance expected
+    FileTransferState m_fileTransfer;
+
     static EspNowHead* s_instance;
 };
