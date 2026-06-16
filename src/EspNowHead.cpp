@@ -30,6 +30,7 @@ void EspNowHead::begin()
 
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
+    esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_LR);
     esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
 
     strlcpy(m_mac, WiFi.macAddress().c_str(), sizeof(m_mac));
@@ -56,6 +57,8 @@ void EspNowHead::begin()
     sendAnnounce();
 }
 
+void EspNowHead::onJump(OnJump cb) { m_onJump = cb; }
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  update
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +72,37 @@ void EspNowHead::update()
 
     if (now - m_lastStatusMs >= STATUS_INTERVAL_MS)
         sendStatus();
+
+    // Deferred state change — set by the ESP-NOW callback (WiFi task / core 0)
+    // and consumed here on the main-loop core so RS485 (broadcastState) and
+    // TFT/OLED (onStateChanged UI callbacks) are only touched from one core.
+    if (m_pendingState)
+    {
+        m_pendingState = false;
+        if (m_pendingFileName[0] != '\0')
+            m_master.setCurrentFileName(String(m_pendingFileName));
+        m_master.setCurrentState(static_cast<State>(m_pendingStateVal));
+        sendStatus();
+    }
+
+    // Deferred RS485 sync — same reason as above.
+    if (m_pendingPushToAll)
+    {
+        m_pendingPushToAll = false;
+        m_fileSync.pushToAll();
+    }
+
+    // Deferred jump — both RS485 broadcast and local sequencer call happen on
+    // the main-loop core. Jump() calls sendFrame() (RS485 UART) which is not
+    // safe from the WiFi task on core 0.
+    if (m_pendingJump)
+    {
+        const int val  = m_pendingJumpVal;
+        m_pendingJump  = false;
+        m_master.Jump(val);
+        if (m_onJump)
+            m_onJump(val);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -184,20 +218,24 @@ void EspNowHead::handleReceivedFrame(const uint8_t* mac,
             Serial.printf("[EspNow] Invalid state: %d\n", stateVal);
             return;
         }
+        // Defer to update() on the main-loop core — setCurrentState() calls
+        // broadcastState() (RS485) and onStateChanged() (TFT/OLED), none of
+        // which are safe to call from the WiFi task on core 0.
         const char* fileName = doc["filename"] | "";
-        if (strlen(fileName) > 0)
-            m_master.setCurrentFileName(String(fileName));
-        m_master.setCurrentState(static_cast<State>(stateVal));
-        sendStatus();
+        strlcpy(m_pendingFileName, fileName, sizeof(m_pendingFileName));
+        m_pendingStateVal = stateVal;
+        m_pendingState    = true;
     }
 
     else if(strcmp(cmd, "jump") == 0) {
-        const int timeInTenth = doc["timeInTenth"] | 0;
-        if(timeInTenth == 0) {
-            Serial.printf("[EspNow] time in tenth not found");
+        if (doc["timeInTenths"].isNull()) {
+            Serial.println("[EspNow] jump: missing timeInTenths field");
             return;
         }
-        m_master.Jump(timeInTenth);
+        // Defer to update() — Jump() calls sendFrame() (RS485 UART) which is
+        // not safe from the WiFi task on core 0.
+        m_pendingJumpVal = doc["timeInTenths"].as<int>();
+        m_pendingJump    = true;
     }
 
     // ── File list request ─────────────────────────────────────────────────────
@@ -230,8 +268,10 @@ void EspNowHead::handleReceivedFrame(const uint8_t* mac,
         handleFileDelete(mac, doc);
     }
 
-    else
+    else if (strlen(cmd) > 0)
     {
+        // Silently ignore messages that have no "cmd" field (e.g. bridge status/ack
+        // messages that use "type" instead) — only log genuinely unknown commands.
         Serial.printf("[EspNow] Unknown cmd: %s\n", cmd);
     }
 }
@@ -374,8 +414,9 @@ void EspNowHead::handleFileEnd(const uint8_t* mac, JsonDocument& doc)
     m_fileTransfer.reset();
     sendAck("file_end_ack", true);
 
-    // Trigger RS485 sync to modules
-    m_fileSync.pushToAll();
+    // Schedule RS485 sync via update() on the main-loop core — calling
+    // pushToAll() here would race with master.update() on the other core.
+    m_pendingPushToAll = true;
 
     // Send updated file list to bridge
     sendFileList();
@@ -405,8 +446,8 @@ void EspNowHead::handleFileDelete(const uint8_t* mac, JsonDocument& doc)
 
     sendAck("delete_ack", true);
 
-    // Trigger RS485 sync to modules (will delete from modules too)
-    m_fileSync.pushToAll();
+    // Schedule RS485 sync via update() — same reason as in handleFileEnd.
+    m_pendingPushToAll = true;
 
     // Send updated file list
     sendFileList();

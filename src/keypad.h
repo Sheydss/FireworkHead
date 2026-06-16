@@ -66,11 +66,17 @@ class Keypad {
 public:
   Keypad(TFT_eSPI& tft);
 
-  void begin();           // call once in setup()
+  void begin();           // call once in setup() — calibrates touch AND draws UI
+  void calibrateOnly();   // calibrate touch without drawing the keypad UI
+  void show();            // redraw UI without recalibrating (use when opening)
+  void setValue(int v);   // pre-fill the buffer with a number before showing
   void update();          // call every loop()
 
   // Returns true when OK was pressed, and fills value with the entered number
   bool getConfirmedValue(int& value);
+
+  /// True when the number buffer is empty (used to switch OK↔Cancel label)
+  bool isEmpty() const { return _numIdx == 0; }
 
 private:
   TFT_eSPI&        _tft;

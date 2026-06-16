@@ -17,7 +17,7 @@ static constexpr uint8_t RS485_MASTER_ADDR = 0x00;
 static constexpr uint8_t RS485_BROADCAST   = 0xFF;
  
 // Tuning
-static constexpr uint16_t RS485_MAX_PAYLOAD  = 1024; ///< Maximum payload bytes per frame
+static constexpr uint16_t RS485_MAX_PAYLOAD  = 512; ///< Maximum payload bytes per frame
 static constexpr uint32_t RS485_TIMEOUT_MS   = 500;  ///< Default response timeout (ms)
 static constexpr uint32_t RS485_DE_DELAY_US  = 50;   ///< DE settle time before TX (µs)
  

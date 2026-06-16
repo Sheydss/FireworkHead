@@ -102,7 +102,7 @@ public:
     String getCurrentFileName();
     void setCurrentFileName(String fileName);
 
-    bool Jump(int timeInTenth)
+    bool Jump(int timeInTenths);
 
     /// Transfer a binary blob to @p dstAddr in CRC-verified chunks.
     /// @param chunkSize  Raw bytes per chunk before base64 encoding.

@@ -223,11 +223,11 @@ void RS485Master::setCurrentFileName(String fileName) {
 
 // jump
 
-bool RS485Master::Jump(int timeInTenth) {
+bool RS485Master::Jump(int timeInTenths) {
     JsonDocument doc;
-    doc["cmd"] = CMD_JUMP;
-    doc["timeInTenth"] = timeInTenth;
-
+    doc["cmd"]          = CMD_JUMP;
+    doc["timeInTenths"] = timeInTenths;
+    Serial.println("jump()");
     String json;
     serializeJson(doc, json);
 
@@ -237,7 +237,8 @@ bool RS485Master::Jump(int timeInTenth) {
               reinterpret_cast<const uint8_t*>(json.c_str()),
               static_cast<uint16_t>(json.length()));
 
-    Serial.printf("[Master] Broadcast jump=%d to all nodes\n", timeInTenth);
+    Serial.printf("[Master] Broadcast jump=%d to all nodes\n", timeInTenths);
+    return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
