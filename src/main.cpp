@@ -2,7 +2,6 @@
 #include <FS.h>
 #include <LittleFS.h>
 #include <TFT_eSPI.h>
-#include "HT_SSD1306Wire.h"
 #include "json.h"
 #include "RS485Master.h"
 #include "FileSyncMaster.h"
@@ -17,9 +16,7 @@ SplashScreen splash(tft);
 RelayView    relayView(tft);
 TopSequencer sequencer;
 
-static SSD1306Wire display(0x3C, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED);
-
-RS485Master    master(Serial1, /*TX*/1, /*RX*/2, /*DE*/5, /*baud*/115200, /*heartbeat*/5000);
+RS485Master    master(Serial1, /*TX*/17, /*RX*/18, /*DE*/16, /*baud*/115200, /*heartbeat*/5000);
 FileSyncMaster fileSync(master, "/plans");
 EspNowHead     espNow(master, fileSync);
 
@@ -29,23 +26,6 @@ State    currentState = State::Preparation;
 
 static constexpr uint8_t DETECT_PINS[RELAY_COUNT] = { 32, 33, 25, 23 };
 static bool s_lastConnected[RELAY_COUNT] = {};
-
-void VextON() { pinMode(Vext, OUTPUT); digitalWrite(Vext, LOW); }
-
-void setUpOled() {
-    VextON();
-    display.init();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.setFont(ArialMT_Plain_10);
-}
-
-void displayOled(String text, String text2 = "") {
-    display.clear();
-    display.drawString(0, 0, text);
-    if (text2 != "")
-        display.drawString(0, 10, text2);
-    display.display();
-}
 
 void checkIgniters()
 {
@@ -99,19 +79,14 @@ void setup() {
     Serial.begin(115200);
     delay(500);
 
-    setUpOled();
-    displayOled("Starting...");
-
     tft.init();
     tft.setRotation(1);  // landscape for splash (matches module orientation)
 
     if (!LittleFS.begin(false)) {
         Serial.println("[FS] Mount failed, formatting...");
-        displayOled("FS formatting...");
         LittleFS.format();
         if (!LittleFS.begin(true)) {
             Serial.println("[FS] Mount failed after format — halting");
-            displayOled("FS error!");
             while (true) delay(1000);
         }
     }
@@ -142,8 +117,6 @@ void setup() {
     master.onStateChanged([]() {
         State s = master.getCurrentState();
         currentState = s;
-
-        displayOled(StateToString(s), master.getCurrentFileName());
 
         switch (s) {
             case State::NotConnected:
@@ -211,7 +184,6 @@ void setup() {
         sequencer.jumpTo(timeInTenths);
     });
 
-    displayOled("Master Started");
     master.setCurrentState(State::Preparation);
 }
 
