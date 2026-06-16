@@ -49,9 +49,9 @@ public:
     /// @param heartbeatIntervalMs  How often to ping all active nodes (ms).
     ///                             Set to 0 to disable automatic heartbeat.
     explicit RS485Master(HardwareSerial& serial              = Serial1,
-                         uint8_t         pinTx               = 1,
-                         uint8_t         pinRx               = 2,
-                         uint8_t         pinDE               = 5,
+                         uint8_t         pinTx               = 17,
+                         uint8_t         pinRx               = 18,
+                         uint8_t         pinDE               = 16,
                          uint32_t        baud                = 115200,
                          uint32_t        heartbeatIntervalMs = 5000);
 
