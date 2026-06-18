@@ -6,6 +6,8 @@
 #include "RelayButton.h"
 #include "Keypad.h"
 
+#define RELAY_CONFIG_PATH "/relay_config.json"
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  RelayView
 //
@@ -47,6 +49,17 @@ public:
 
     /// Read-only access to a relay button (e.g. to read its shot number).
     const RelayButton& button(uint8_t index) const;
+
+    /// Load touch calibration without drawing the relay UI.
+    /// Call before using touch input prior to begin().
+    void calibrateTouch();
+
+    /// Persist all ASSIGNED relay→shot mappings to @p path (LittleFS JSON).
+    void saveConfig(const char* path) const;
+
+    /// Restore ASSIGNED relay→shot mappings from @p path.
+    /// Returns false if the file is missing or corrupt.
+    bool loadConfig(const char* path);
 
 private:
     // ── Main view ─────────────────────────────────────────────────────────────

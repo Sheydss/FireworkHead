@@ -1,4 +1,5 @@
 #include "RelayView.h"
+#include <ArduinoJson.h>
 
 // Mirror OK button geometry from Keypad.h
 static constexpr int16_t KP_OK_X = OK_X;
@@ -106,6 +107,74 @@ void RelayView::setConnected(uint8_t index, bool connected)
                 closeKeypad();
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  calibrateTouch
+// ─────────────────────────────────────────────────────────────────────────────
+
+void RelayView::calibrateTouch()
+{
+    m_keypad.calibrateOnly();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  saveConfig
+// ─────────────────────────────────────────────────────────────────────────────
+
+void RelayView::saveConfig(const char* path) const
+{
+    JsonDocument doc;
+    JsonArray arr = doc["relays"].to<JsonArray>();
+    for (uint8_t i = 0; i < RELAY_COUNT; ++i)
+    {
+        if (m_buttons[i].state() == RelayState::ASSIGNED)
+        {
+            JsonObject o = arr.add<JsonObject>();
+            o["i"] = i;
+            o["s"] = m_buttons[i].shotNumber();
+        }
+    }
+    fs::File f = LittleFS.open(path, "w", true);
+    if (f)
+    {
+        serializeJson(doc, f);
+        f.close();
+        Serial.printf("[Config] Saved relay config to %s\n", path);
+    }
+    else
+    {
+        Serial.printf("[Config] Failed to open %s for writing\n", path);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  loadConfig
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool RelayView::loadConfig(const char* path)
+{
+    fs::File f = LittleFS.open(path, "r");
+    if (!f) return false;
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    if (err != DeserializationError::Ok)
+    {
+        Serial.printf("[Config] Failed to parse %s: %s\n", path, err.c_str());
+        return false;
+    }
+    for (JsonObject o : doc["relays"].as<JsonArray>())
+    {
+        uint8_t idx  = o["i"] | 255u;
+        int     shot = o["s"] | 0;
+        if (idx < RELAY_COUNT && shot > 0)
+        {
+            m_buttons[idx].setAssigned(m_tft, shot);
+            Serial.printf("[Config] Relay %u → shot %d\n", idx + 1, shot);
+        }
+    }
+    return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -218,6 +287,7 @@ void RelayView::handleKeypadResult(int value)
     Serial.printf("[RelayView] Relay %u assigned to shot %d\n",
                   m_buttons[m_activeRelay].relayNumber(), value);
 
+    saveConfig(RELAY_CONFIG_PATH);
     closeKeypad();
 }
 
