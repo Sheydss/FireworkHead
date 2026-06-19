@@ -6,9 +6,10 @@ extern const GFXfont FreeSansBold18pt7b;
 //  Constructor
 // ─────────────────────────────────────────────────────────────────────────────
 
-RelayButton::RelayButton(uint8_t index, uint8_t relayNumber)
+RelayButton::RelayButton(uint8_t index, uint8_t relayNumber, char defaultChar)
     : m_index(index)
     , m_relayNumber(relayNumber)
+    , m_defaultChar(defaultChar)
 {}
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,7 +100,7 @@ void RelayButton::drawLabel(TFT_eSPI& tft) const
     {
         case RelayState::DISCONNECTED:
         case RelayState::CONNECTED:
-            snprintf(label, sizeof(label), "%u", m_relayNumber);
+            snprintf(label, sizeof(label), "%c", m_defaultChar);
             break;
         case RelayState::ASSIGNED:
             snprintf(label, sizeof(label), "%d", m_shotNumber);

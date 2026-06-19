@@ -48,6 +48,8 @@
 #define COL_OK_PR     0x07E0
 #define COL_DEL       0x6000
 #define COL_DEL_PR    0xF800
+#define COL_RST       0xFD20  // orange — signals "return to connected state"
+#define COL_RST_PR    0xFF80  // lighter orange when pressed
 #define COL_DISP_BG   0x0000
 #define COL_DISP_BR   0x07FF
 #define COL_NUM       0x07FF
@@ -75,6 +77,13 @@ public:
   // Returns true when OK was pressed, and fills value with the entered number
   bool getConfirmedValue(int& value);
 
+  // Returns true once when the RST button was pressed (buffer empty + DEL tapped)
+  bool getResetRequested();
+
+  // Redraw the DEL/RST button to reflect current buffer state.
+  // Call whenever isEmpty() changes and after show().
+  void syncDelButtonLabel();
+
   /// True when the number buffer is empty (used to switch OK↔Cancel label)
   bool isEmpty() const { return _numIdx == 0; }
 
@@ -94,6 +103,9 @@ private:
   // Confirmed value state
   bool _confirmed;
   int  _confirmedValue;
+
+  // Reset request state
+  bool _resetRequested;
 
   void _touchCalibrate();
   void _drawUI();

@@ -16,14 +16,14 @@ RelayView::RelayView(TFT_eSPI& tft)
     , m_keypad(tft)
     , m_buttons
       {
-          RelayButton(0, 1),
-          RelayButton(1, 2),
-          RelayButton(2, 3),
-          RelayButton(3, 4),
-          RelayButton(4, 5),
-          RelayButton(5, 6),
-          RelayButton(6, 7),
-          RelayButton(7, 8),
+          RelayButton(0, 1, 'a'),
+          RelayButton(1, 2, 'b'),
+          RelayButton(2, 3, 'c'),
+          RelayButton(3, 4, 'd'),
+          RelayButton(4, 5, 'e'),
+          RelayButton(5, 6, 'f'),
+          RelayButton(6, 7, 'g'),
+          RelayButton(7, 8, 'h'),
 
       }
 {}
@@ -67,6 +67,7 @@ void RelayView::update()
         if (nowEmpty != m_wasEmpty)
         {
             syncOkButtonLabel();
+            m_keypad.syncDelButtonLabel();
             m_wasEmpty = nowEmpty;
         }
 
@@ -75,6 +76,13 @@ void RelayView::update()
         int value = 0;
         if (m_keypad.getConfirmedValue(value))
             handleKeypadResult(value);
+
+        if (m_keypad.getResetRequested())
+        {
+            m_buttons[m_activeRelay].clearAssignment(m_tft);
+            saveConfig(RELAY_CONFIG_PATH);
+            closeKeypad();
+        }
     }
     else
     {
@@ -257,6 +265,7 @@ void RelayView::openKeypad(uint8_t relayIndex)
     }
 
     syncOkButtonLabel();
+    m_keypad.syncDelButtonLabel();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
