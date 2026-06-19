@@ -36,9 +36,10 @@ void Keypad::show() {
   _numIdx        = 0;
   _numBuf[0]     = 0;
   _pressedIdx    = -1;
-  _confirmed     = false;
+  _confirmed      = false;
   _confirmedValue = 0;
-  _wasTouching   = false;
+  _resetRequested = false;
+  _wasTouching    = false;
   _actionDone    = false;
   _missCount     = 0;
 
@@ -91,10 +92,7 @@ void Keypad::update() {
           _tft.setTextColor(COL_KEY_TXT, COL_OK);
           _tft.drawString("OK", OK_X, OK_Y);
         } else if (_pressedIdx == 11) {
-          _tft.fillRoundRect(DEL_X - DEL_W/2, DEL_Y - DEL_H/2, DEL_W, DEL_H, 6, COL_DEL);
-          _tft.setTextDatum(MC_DATUM);
-          _tft.setTextColor(COL_KEY_TXT, COL_DEL);
-          _tft.drawString("<", DEL_X, DEL_Y);
+          syncDelButtonLabel();
         } else {
           _keys[_pressedIdx].drawButton(false);
         }
@@ -124,12 +122,23 @@ void Keypad::update() {
         _confirmValue();
 
       } else if (i == 11) {
-        _tft.fillRoundRect(DEL_X - DEL_W/2, DEL_Y - DEL_H/2, DEL_W, DEL_H, 6, COL_DEL_PR);
-        _tft.setFreeFont(FONT_KEY);
-        _tft.setTextDatum(MC_DATUM);
-        _tft.setTextColor(TFT_WHITE, COL_DEL_PR);
-        _tft.drawString("<", DEL_X, DEL_Y);
-        _deleteDigit();
+        if (_numIdx == 0) {
+          // Buffer empty → RST pressed
+          _tft.fillRoundRect(DEL_X - DEL_W/2, DEL_Y - DEL_H/2, DEL_W, DEL_H, 6, COL_RST_PR);
+          _tft.setFreeFont(FONT_KEY);
+          _tft.setTextDatum(MC_DATUM);
+          _tft.setTextColor(TFT_WHITE, COL_RST_PR);
+          _tft.drawString("RST", DEL_X, DEL_Y);
+          _resetRequested = true;
+        } else {
+          // Buffer has content → normal delete
+          _tft.fillRoundRect(DEL_X - DEL_W/2, DEL_Y - DEL_H/2, DEL_W, DEL_H, 6, COL_DEL_PR);
+          _tft.setFreeFont(FONT_KEY);
+          _tft.setTextDatum(MC_DATUM);
+          _tft.setTextColor(TFT_WHITE, COL_DEL_PR);
+          _tft.drawString("<", DEL_X, DEL_Y);
+          _deleteDigit();
+        }
 
       } else {
         _keys[i].drawButton(true);
@@ -137,6 +146,25 @@ void Keypad::update() {
       }
     }
   }
+}
+
+bool Keypad::getResetRequested() {
+  if (_resetRequested) {
+    _resetRequested = false;
+    return true;
+  }
+  return false;
+}
+
+void Keypad::syncDelButtonLabel() {
+  const bool     empty   = (_numIdx == 0);
+  const uint16_t bgColor = empty ? COL_RST : COL_DEL;
+  const char*    label   = empty ? "RST"   : "<";
+  _tft.setFreeFont(FONT_KEY);
+  _tft.fillRoundRect(DEL_X - DEL_W/2, DEL_Y - DEL_H/2, DEL_W, DEL_H, 6, bgColor);
+  _tft.setTextDatum(MC_DATUM);
+  _tft.setTextColor(COL_KEY_TXT, bgColor);
+  _tft.drawString(label, DEL_X, DEL_Y);
 }
 
 bool Keypad::getConfirmedValue(int& value) {
