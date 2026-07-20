@@ -2,6 +2,9 @@
 #include <FS.h>
 #include <LittleFS.h>
 #include <TFT_eSPI.h>
+#include <esp_system.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 #include "json.h"
 #include "RS485Master.h"
 #include "FileSyncMaster.h"
@@ -16,7 +19,7 @@ SplashScreen splash(tft);
 RelayView    relayView(tft);
 TopSequencer sequencer;
 
-RS485Master    master(Serial1, /*TX*/17, /*RX*/18, /*DE*/16, /*baud*/115200, /*heartbeat*/5000);
+RS485Master    master(Serial1, /*TX*/17, /*RX*/18, /*DE*/16, /*baud*/9600, /*heartbeat*/5000);
 FileSyncMaster fileSync(master, "/plans");
 EspNowHead     espNow(master, fileSync);
 
@@ -139,6 +142,7 @@ void loadTops(String fileName) {
 }
 
 void setup() {
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);  // disable brownout — WiFi init spikes current
     Serial.begin(115200);
     delay(500);
 

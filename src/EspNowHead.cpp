@@ -112,8 +112,9 @@ void EspNowHead::update()
 void EspNowHead::sendAnnounce()
 {
     JsonDocument doc;
-    doc["type"] = "announce";
-    doc["mac"]  = m_mac;
+    doc["type"]  = "announce";
+    doc["mac"]   = m_mac;
+    doc["state"] = static_cast<int>(m_master.getCurrentState());
 
     String json;
     serializeJson(doc, json);

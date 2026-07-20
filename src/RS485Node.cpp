@@ -51,12 +51,10 @@ void RS485Node::setRxMode()
 
     digitalWrite(m_pinDE, LOW);
 
-    // Discard any echo bytes we received of our own transmission.
-    // On a shared RS485 bus the sender sees its own bytes reflected back.
-    // We must drop exactly those bytes and nothing else — so we only flush
-    // bytes that are already in the buffer RIGHT NOW, not future ones.
-    const uint32_t drainDeadline = millis() + 5;
-    while (m_serial.available() && millis() < drainDeadline)
+    // DE+RE share one pin: RE is disabled during TX so there are no echo
+    // bytes. Drain only what is immediately in the buffer right now (bus
+    // noise); do NOT loop with a timeout or incoming frames get consumed.
+    while (m_serial.available())
         m_serial.read();
 }
 
