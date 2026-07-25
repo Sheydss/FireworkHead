@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  RelayView
 //
-//  Manages the full ILI9341 UI in portrait mode (rotation 0, 240×320).
+//  Manages the full ILI9488 UI in portrait mode (rotation 0, 320×480).
 //
 //  Both the main view (2×2 relay buttons) and the keypad use the same
 //  portrait orientation — no rotation switching needed.

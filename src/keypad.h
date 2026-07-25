@@ -4,41 +4,41 @@
 #include <LittleFS.h>
 #include <FS.h>
 
-#define CALIBRATION_FILE "/TouchCalV"
+#define CALIBRATION_FILE "/TouchCalV0"
 #define REPEAT_CAL       false
 
-// Screen
-#define SCREEN_W   240
-#define SCREEN_H   320
-#define HEADER_H    80
+// Screen — portrait 320×480
+#define SCREEN_W   320
+#define SCREEN_H   480
+#define HEADER_H    68
 
-// OK button
-#define OK_X        40
-#define OK_Y        40
-#define OK_W        68
+// OK button — left of display
+#define OK_X        38
+#define OK_Y        34
+#define OK_W        64
 #define OK_H        52
 
-// DEL button
-#define DEL_X      200
-#define DEL_Y       40
-#define DEL_W       68
+// DEL button — right of display
+#define DEL_X      282
+#define DEL_Y       34
+#define DEL_W       64
 #define DEL_H       52
 
-// Display box
+// Display box — between OK and DEL
 #define DISP_X      74
 #define DISP_Y       6
-#define DISP_W      92
-#define DISP_H      68
+#define DISP_W     168
+#define DISP_H      56
 
 // Keypad geometry
-#define PAD_TOP     (HEADER_H + 4)
+#define PAD_TOP    (HEADER_H + 4)
 #define KEY_COLS    3
 #define KEY_ROWS    4
-#define KEY_W       72
-#define KEY_H       54
+#define KEY_W       96
+#define KEY_H       95
 #define KEY_GAP_X    6
-#define KEY_GAP_Y    6
-#define PAD_LEFT     6
+#define KEY_GAP_Y    5
+#define PAD_LEFT     8
 
 // Colours
 #define COL_BG        0x1082

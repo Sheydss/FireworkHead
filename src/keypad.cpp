@@ -216,6 +216,7 @@ void Keypad::_redrawDisplay() {
 }
 
 void Keypad::_drawUI() {
+  _tft.setRotation(0); // portrait 320×480
   _tft.fillScreen(COL_BG);
   _tft.fillRect(0, 0, SCREEN_W, HEADER_H, 0x0841);
   _tft.fillRoundRect(DISP_X, DISP_Y, DISP_W, DISP_H, 6, COL_DISP_BG);

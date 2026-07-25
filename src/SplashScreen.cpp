@@ -1,9 +1,16 @@
 #include "SplashScreen.h"
 
 // Static member definitions
-TFT_eSPI* SplashScreen::s_tft     = nullptr;
-int       SplashScreen::s_offsetX  = 0;
-int       SplashScreen::s_offsetY  = 0;
+TFT_eSPI*  SplashScreen::s_tft      = nullptr;
+int        SplashScreen::s_offsetX   = 0;
+int        SplashScreen::s_offsetY   = 0;
+uint8_t*   SplashScreen::s_frameBuf  = nullptr;
+int        SplashScreen::s_canvasW   = 0;
+int        SplashScreen::s_canvasH   = 0;
+int        SplashScreen::s_dirtyX0   = 0;
+int        SplashScreen::s_dirtyY0   = 0;
+int        SplashScreen::s_dirtyX1   = -1;
+int        SplashScreen::s_dirtyY1   = -1;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Constructor
@@ -33,31 +40,67 @@ void SplashScreen::play(const uint8_t* data, uint32_t dataSize)
         return;
     }
 
-    // Compute centering offset once from canvas size — NOT frame size.
-    // Individual delta frames can be smaller than the canvas so using
-    // frame size would cause the centering to shift between frames.
-    const int gifW    = m_gif.getCanvasWidth();
-    const int gifH    = m_gif.getCanvasHeight();
+    s_canvasW = m_gif.getCanvasWidth();
+    s_canvasH = m_gif.getCanvasHeight();
+
     const int screenW = m_tft.width();
     const int screenH = m_tft.height();
-
-    s_offsetX = max(0, (screenW - gifW) / 2);
-    s_offsetY = max(0, (screenH - gifH) / 2);
+    s_offsetX = max(0, (screenW - s_canvasW) / 2);
+    s_offsetY = max(0, (screenH - s_canvasH) / 2);
 
     Serial.printf("[Splash] GIF=%dx%d  Screen=%dx%d  Offset=(%d,%d)\n",
-                  gifW, gifH, screenW, screenH, s_offsetX, s_offsetY);
+                  s_canvasW, s_canvasH, screenW, screenH, s_offsetX, s_offsetY);
+
+    // 3 bytes/pixel (RGB888) PSRAM frame buffer — gifDraw fills it,
+    // one writeBytes() burst per frame instead of per-pixel spi.transfer().
+    const size_t fbBytes = (size_t)s_canvasW * s_canvasH * 3;
+    s_frameBuf = (uint8_t*)heap_caps_malloc(fbBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_frameBuf)
+        s_frameBuf = (uint8_t*)malloc(fbBytes);
+    if (s_frameBuf)
+        memset(s_frameBuf, 0, fbBytes);
+
+    Serial.printf("[Splash] Frame buf %s (%u bytes)\n",
+                  s_frameBuf ? "OK" : "FAILED", (unsigned)fbBytes);
 
     m_tft.fillScreen(TFT_BLACK);
-    m_tft.startWrite(); // hold SPI bus for speed
+    m_tft.startWrite();
 
-    while (m_gif.playFrame(true, nullptr))
+    while (true)
+    {
+        // Reset dirty rect — gifDraw will expand it for each scan line decoded
+        s_dirtyX0 = s_canvasW;  s_dirtyY0 = s_canvasH;
+        s_dirtyX1 = -1;          s_dirtyY1 = -1;
+
+        if (!m_gif.playFrame(false, nullptr))
+            break;
+
+        // Only push the changed region — typically just the moving spark pixels
+        if (s_frameBuf && s_dirtyX1 >= s_dirtyX0)
+        {
+            const int dw = s_dirtyX1 - s_dirtyX0 + 1;
+            m_tft.setAddrWindow(s_offsetX + s_dirtyX0,
+                                s_offsetY + s_dirtyY0,
+                                dw,
+                                s_dirtyY1 - s_dirtyY0 + 1);
+            for (int r = s_dirtyY0; r <= s_dirtyY1; ++r)
+            {
+                const uint8_t* p = s_frameBuf + (r * s_canvasW + s_dirtyX0) * 3;
+                m_tft.getSPIinstance().writeBytes((uint8_t*)p, dw * 3);
+            }
+        }
         yield();
+    }
 
     m_tft.endWrite();
     m_gif.close();
+
+    if (s_frameBuf) { free(s_frameBuf); s_frameBuf = nullptr; }
     s_tft     = nullptr;
     s_offsetX = 0;
     s_offsetY = 0;
+    s_canvasW = 0;
+    s_canvasH = 0;
 
     Serial.println("[Splash] Done");
 }
@@ -71,53 +114,39 @@ void SplashScreen::gifDraw(GIFDRAW* pDraw)
     if (!s_tft)
         return;
 
-    // Position of this scan line on screen.
-    // s_offsetX/Y are the canvas centering offsets computed once in play().
-    // pDraw->iX/iY are the frame position within the canvas.
-    // pDraw->y is the current scan line within the frame.
-    const int x = s_offsetX + pDraw->iX;
-    const int y = s_offsetY + pDraw->iY + pDraw->y;
-
-    if (y < 0 || y >= s_tft->height())
+    if (!s_frameBuf)
         return;
 
-    // Clamp width to screen boundary
-    int w = pDraw->iWidth;
-    if (x + w > s_tft->width())
-        w = s_tft->width() - x;
-    if (w <= 0)
+    // Write this scan line into the PSRAM canvas buffer.
+    // pDraw->iX/iY = frame position within the canvas.
+    // pDraw->y     = current scan line within the frame.
+    const int row = pDraw->iY + pDraw->y;
+    if (row < 0 || row >= s_canvasH)
         return;
 
-    if (pDraw->ucHasTransparency)
+    const uint8_t* src       = pDraw->pPixels;
+    const uint8_t  transpIdx = pDraw->ucTransparent;
+    const int      startCol  = pDraw->iX;
+    const int      w         = min((int)pDraw->iWidth, s_canvasW - startCol);
+    uint8_t*       dst       = s_frameBuf + (row * s_canvasW + startCol) * 3;
+
+    for (int i = 0; i < w; ++i, dst += 3)
     {
-        // With palette-indexed pixels, transparent pixels must be skipped.
-        // Build a line buffer replacing transparent entries with background.
-        static uint16_t lineBuf[320];
-        const uint8_t   transpIdx = pDraw->ucTransparent;
-        const uint8_t*  src       = pDraw->pPixels;
-
-        for (int i = 0; i < w; ++i)
-        {
-            if (src[i] == transpIdx)
-            {
-                lineBuf[i] = TFT_BLACK;
-            }
-            else
-            {
-                // Swap high and low bytes to convert RGB565 → BGR565
-                const uint16_t c = pDraw->pPalette[src[i]];
-                lineBuf[i] = (c >> 8) | (c << 8);
-            }
-        }
-        s_tft->pushImage(x, y, w, 1, lineBuf);
+        if (pDraw->ucHasTransparency && src[i] == transpIdx)
+            continue; // keep existing pixel — correct for delta frames
+        const uint16_t c = pDraw->pPalette[src[i]];
+        dst[0] = (c >> 8) & 0xF8; // R
+        dst[1] = (c >> 3) & 0xFC; // G
+        dst[2] = (c << 3) & 0xF8; // B
     }
-    else
+
+    // Expand dirty rect to cover this scan line so only the changed region is
+    // sent to the display after playFrame() finishes decoding the full frame.
+    if (w > 0)
     {
-        // No transparency — swap bytes of every pixel in-place
-        static uint16_t lineBuf[320];
-        const uint16_t* src = reinterpret_cast<const uint16_t*>(pDraw->pPixels);
-        for (int i = 0; i < w; ++i)
-            lineBuf[i] = (src[i] >> 8) | (src[i] << 8);
-        s_tft->pushImage(x, y, w, 1, lineBuf);
+        if (startCol     < s_dirtyX0) s_dirtyX0 = startCol;
+        if (startCol+w-1 > s_dirtyX1) s_dirtyX1 = startCol + w - 1;
+        if (row          < s_dirtyY0) s_dirtyY0 = row;
+        if (row          > s_dirtyY1) s_dirtyY1 = row;
     }
 }

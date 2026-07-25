@@ -37,27 +37,27 @@ static bool s_pendingConfigLoad                   = false;
 // Must be called after relayView.calibrateTouch() so touch coords are valid.
 static bool showConfigPopup()
 {
-    // landscape 320×240 — same rotation as the splash screen
+    // Portrait 320×480 — calibration is at rotation 0
     tft.fillScreen(TFT_NAVY);
     tft.setTextDatum(MC_DATUM);
     tft.setFreeFont(&FreeSansBold18pt7b);
     tft.setTextColor(TFT_WHITE, TFT_NAVY);
-    tft.drawString("Config found!", 160, 35);
-    tft.drawString("Reload relay", 160, 78);
-    tft.drawString("assignments?", 160, 108);
+    tft.drawString("Config found!", 160, 80);
+    tft.drawString("Reload relay", 160, 150);
+    tft.drawString("assignments?", 160, 200);
 
-    tft.drawFastHLine(0, 160, 320, TFT_WHITE);
+    tft.drawFastHLine(0, 360, 320, TFT_WHITE);
 
-    // YES button — left half
-    tft.fillRect(0, 161, 160, 79, TFT_DARKGREEN);
-    tft.drawFastVLine(159, 161, 79, TFT_WHITE);
+    // YES button — left half, ~1/4 screen height
+    tft.fillRect(0, 361, 160, 119, TFT_DARKGREEN);
+    tft.drawFastVLine(159, 361, 119, TFT_WHITE);
     tft.setTextColor(TFT_WHITE, TFT_DARKGREEN);
-    tft.drawString("YES", 80, 200);
+    tft.drawString("YES", 80, 420);
 
-    // NO button — right half
-    tft.fillRect(160, 161, 160, 79, 0xC000); // dark red
+    // NO button — right half, ~1/4 screen height
+    tft.fillRect(160, 361, 160, 119, 0xC000); // dark red
     tft.setTextColor(TFT_WHITE, 0xC000);
-    tft.drawString("NO", 240, 200);
+    tft.drawString("NO", 240, 420);
 
     const uint32_t start   = millis();
     uint32_t       lastSec = 99;
@@ -71,22 +71,18 @@ static bool showConfigPopup()
         if (remaining != lastSec)
         {
             lastSec = remaining;
-            tft.fillRect(0, 130, 320, 26, TFT_NAVY);
+            tft.fillRect(0, 300, 320, 30, TFT_NAVY);
             tft.setTextColor(TFT_YELLOW, TFT_NAVY);
-            tft.drawString("Auto-load in " + String(remaining) + "s", 160, 143);
+            tft.drawString("Auto-load in " + String(remaining) + "s", 160, 315);
         }
 
         uint16_t tx = 0, ty = 0;
         if (tft.getTouch(&tx, &ty))
         {
-            // Calibration was stored at rotation 0 (portrait).
-            // Convert portrait coords to landscape: lx = ty, ly = 239 - tx.
-            uint16_t lx = ty;
-            uint16_t ly = 239 - tx;
-            if (ly >= 160)
+            if (ty >= 361)
             {
                 delay(50); // debounce
-                return lx < 160; // YES = left, NO = right
+                return tx < 160; // YES = left, NO = right
             }
         }
         delay(20);
@@ -136,7 +132,7 @@ void drawState(State state) {
     tft.setFreeFont(&FreeSansBold18pt7b);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     String stateStr = StateToString(state);
-    tft.drawString(stateStr, 320 / 2, 20);
+    tft.drawString(stateStr, 480 / 2, 20);
 }
 
 void loadTops(String fileName) {
@@ -166,7 +162,7 @@ void setup() {
     displayOled("Starting...");
 
     tft.init();
-    tft.setRotation(1);  // landscape for splash (matches module orientation)
+    tft.setRotation(0);  // portrait for touch calibration
 
     if (!LittleFS.begin(false)) {
         Serial.println("[FS] Mount failed, formatting...");
@@ -191,6 +187,7 @@ void setup() {
     //    pinMode(DETECT_PINS[i], INPUT);
 
     // ── Splash screen ─────────────────────────────────────────────────────────
+    tft.setRotation(1);  // landscape for splash
     splash.play(logo_gif, logo_gif_size);
 
     // ── RS485 master callbacks ────────────────────────────────────────────────
@@ -267,7 +264,7 @@ void setup() {
     // ── Sequencer fire callback ───────────────────────────────────────────────
     sequencer.onFire([](int id) {
         Serial.printf("[App] Fire top id=%d\n", id);
-        tft.drawString("fire " + String(id), 320/2, 120);
+        tft.drawString("fire " + String(id), 480/2, 120);
         // TODO: trigger relay via I2C GPIO extender
     });
 

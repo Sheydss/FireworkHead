@@ -5,17 +5,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  RelayButton
 //
-//  One relay channel button in a 2×4 portrait layout (240×320).
+//  One relay channel button in a 2×4 portrait layout (320×480).
 //
 //  Each button occupies half the screen width and a quarter of the height:
-//    index 0 → row 0, col 0  (  0,   0, 120, 80)
-//    index 1 → row 0, col 1  (120,   0, 120, 80)
-//    index 2 → row 1, col 0  (  0,  80, 120, 80)
-//    index 3 → row 1, col 1  (120,  80, 120, 80)
-//    index 4 → row 2, col 0  (  0, 160, 120, 80)
-//    index 5 → row 2, col 1  (120, 160, 120, 80)
-//    index 6 → row 3, col 0  (  0, 240, 120, 80)
-//    index 7 → row 3, col 1  (120, 240, 120, 80)
+//    index 0 → row 0, col 0  (  0,   0, 160, 120)
+//    index 1 → row 0, col 1  (160,   0, 160, 120)
+//    index 2 → row 1, col 0  (  0, 120, 160, 120)
+//    index 3 → row 1, col 1  (160, 120, 160, 120)
+//    index 4 → row 2, col 0  (  0, 240, 160, 120)
+//    index 5 → row 2, col 1  (160, 240, 160, 120)
+//    index 6 → row 3, col 0  (  0, 360, 160, 120)
+//    index 7 → row 3, col 1  (160, 360, 160, 120)
 //
 //  States
 //    DISCONNECTED  Red    — igniter absent, tap ignored
@@ -23,13 +23,13 @@
 //    ASSIGNED      Green  — shot number confirmed
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Portrait screen dimensions
-static constexpr uint16_t MAIN_SCREEN_W = 240;
-static constexpr uint16_t MAIN_SCREEN_H = 320;
+// Portrait screen dimensions (ILI9488, rotation 0)
+static constexpr uint16_t MAIN_SCREEN_W = 320;
+static constexpr uint16_t MAIN_SCREEN_H = 480;
 static constexpr uint16_t BTN_COLS      = 2;
 static constexpr uint16_t BTN_ROWS      = 4;
-static constexpr uint16_t BTN_W         = MAIN_SCREEN_W / BTN_COLS; // 120
-static constexpr uint16_t BTN_H         = MAIN_SCREEN_H / BTN_ROWS; //  80
+static constexpr uint16_t BTN_W         = MAIN_SCREEN_W / BTN_COLS; // 160
+static constexpr uint16_t BTN_H         = MAIN_SCREEN_H / BTN_ROWS; // 120
 
 // Button colours (RGB565)
 static constexpr uint16_t BTN_COL_DISCONNECTED = 0xF800; // red
