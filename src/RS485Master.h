@@ -9,10 +9,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  RS485Master  –  Heltec LoRa 32 V4
 //
-//  Wiring
-//    MAX485 DI   ← GPIO 19  (TX / Serial1)
-//    MAX485 RO   → GPIO 20  (RX / Serial1)
-//    MAX485 DE+RE← GPIO 5   (direction)
+//  Wiring (MAX3485 — auto direction, no DE pin needed)
+//    MAX3485 DI  ← GPIO 17  (TX / Serial1)
+//    MAX3485 RO  → GPIO 18  (RX / Serial1)
 //    VCC 3.3 V / GND
 //
 //  Usage
@@ -51,7 +50,7 @@ public:
     explicit RS485Master(HardwareSerial& serial              = Serial1,
                          uint8_t         pinTx               = 17,
                          uint8_t         pinRx               = 18,
-                         uint8_t         pinDE               = 16,
+                         uint8_t         pinDE               = RS485_NO_DE_PIN,
                          uint32_t        baud                = 115200,
                          uint32_t        heartbeatIntervalMs = 5000);
 

@@ -28,8 +28,11 @@ void RS485Node::begin()
     // ── 2. Configure DE pin AFTER UART is up ──────────────────────────────────
     // The ESP32 GPIO mux is reconfigured by Serial.begin() — setting DE before
     // that call can leave the pin in an undefined state.
-    pinMode(m_pinDE, OUTPUT);
-    digitalWrite(m_pinDE, LOW);  // idle = RX mode
+    // Skipped when RS485_NO_DE_PIN is passed (MAX3485 and other auto-DE chips).
+    if (m_pinDE != RS485_NO_DE_PIN) {
+        pinMode(m_pinDE, OUTPUT);
+        digitalWrite(m_pinDE, LOW);  // idle = RX mode
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,22 +41,23 @@ void RS485Node::begin()
 
 void RS485Node::setTxMode()
 {
-    digitalWrite(m_pinDE, HIGH);
-    delayMicroseconds(RS485_DE_DELAY_US);
+    if (m_pinDE != RS485_NO_DE_PIN) {
+        digitalWrite(m_pinDE, HIGH);
+        delayMicroseconds(RS485_DE_DELAY_US);
+    }
 }
 
 void RS485Node::setRxMode()
 {
     // Wait for TX hardware buffer to drain before releasing the bus.
-    // NOTE: flush() on ESP32 only drains TX — it does NOT clear RX,
-    // but we call it before switching DE to avoid cutting a transmission short.
     m_serial.flush();
 
-    digitalWrite(m_pinDE, LOW);
+    if (m_pinDE != RS485_NO_DE_PIN) {
+        digitalWrite(m_pinDE, LOW);
+    }
 
-    // DE+RE share one pin: RE is disabled during TX so there are no echo
-    // bytes. Drain only what is immediately in the buffer right now (bus
-    // noise); do NOT loop with a timeout or incoming frames get consumed.
+    // Drain echo bytes left in RX buffer (MAX485: echo during TX because RE
+    // was disabled; MAX3485: no echo, but flush noise anyway).
     while (m_serial.available())
         m_serial.read();
 }
@@ -90,6 +94,10 @@ bool RS485Node::sendFrame(uint8_t        dst,
     buf[idx++] = RS485_ETX;
 
     setTxMode();
+    // Preamble byte: triggers auto-direction RX→TX switching before the real
+    // STX arrives. 0xFF is safe — the receiver's STX-hunting loop ignores it.
+    const uint8_t preamble = 0xFF;
+    m_serial.write(&preamble, 1);
     m_serial.write(buf, idx);
     m_serial.flush();           // wait for last byte to leave the UART TX register
     delayMicroseconds(100);     // let the bus line settle before releasing DE

@@ -15,6 +15,9 @@ static constexpr uint8_t RS485_ETX = 0x03;
 // Reserved addresses
 static constexpr uint8_t RS485_MASTER_ADDR = 0x00;
 static constexpr uint8_t RS485_BROADCAST   = 0xFF;
+
+// Pass as pinDE to disable direction-control (MAX3485 and other auto-DE transceivers)
+static constexpr uint8_t RS485_NO_DE_PIN   = 0xFE;
  
 // Tuning
 static constexpr uint16_t RS485_MAX_PAYLOAD  = 512; ///< Maximum payload bytes per frame

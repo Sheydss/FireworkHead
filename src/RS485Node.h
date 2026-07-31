@@ -17,7 +17,7 @@ public:
     /// @param serial   HardwareSerial instance wired to the MAX485
     /// @param pinTx    ESP32 TX GPIO  → MAX485 DI
     /// @param pinRx    ESP32 RX GPIO  ← MAX485 RO
-    /// @param pinDE    Direction-enable GPIO → MAX485 DE+RE (HIGH = TX, LOW = RX)
+    /// @param pinDE    Direction-enable GPIO (HIGH = TX, LOW = RX). Pass RS485_NO_DE_PIN for auto-DE chips (MAX3485).
     /// @param baud     UART baud rate (default 115 200)
     RS485Node(HardwareSerial& serial,
               uint8_t         pinTx,

@@ -13,13 +13,15 @@
 #include "logo_gif.h"
 #include "RelayView.h"
 #include "TopSequencer.h"
+#include "StatusLed.h"
 
 TFT_eSPI     tft = TFT_eSPI();
 SplashScreen splash(tft);
 RelayView    relayView(tft);
+StatusLed    statusLed;
 TopSequencer sequencer;
 
-RS485Master    master(Serial1, /*TX*/17, /*RX*/18, /*DE*/16, /*baud*/9600, /*heartbeat*/5000);
+RS485Master    master(Serial1, /*TX*/17, /*RX*/18, /*DE*/RS485_NO_DE_PIN, /*baud*/9600, /*heartbeat*/5000);
 FileSyncMaster fileSync(master, "/plans");
 EspNowHead     espNow(master, fileSync);
 
@@ -27,9 +29,12 @@ Top*     tops         = nullptr;
 uint16_t topCount     = 0;
 State    currentState = State::Preparation;
 
-static constexpr uint8_t DETECT_PINS[RELAY_COUNT] = { 32, 33, 25, 23 };
+static constexpr uint8_t DETECT_PINS[RELAY_COUNT] = { 1, 2 };
 static bool s_lastConnected[RELAY_COUNT]          = {};
 static bool s_pendingConfigLoad                   = false;
+
+static constexpr uint8_t DOWNSTREAM_PRESENCE_PIN = 16;
+static bool s_lastDownstream = false;
 
 // Shows a full-screen popup in portrait mode asking whether to restore the saved
 // relay config. Returns true if the user taps YES or the 5-second countdown
@@ -93,6 +98,17 @@ static bool showConfigPopup()
     }
 }
 
+void checkDownstream()
+{
+    const bool downstream = digitalRead(DOWNSTREAM_PRESENCE_PIN) == HIGH;
+    if (downstream != s_lastDownstream)
+    {
+        s_lastDownstream = downstream;
+        statusLed.setConnected(downstream);
+        Serial.printf("[App] Downstream module %s\n", downstream ? "connected" : "disconnected");
+    }
+}
+
 void checkIgniters()
 {
     for (uint8_t i = 0; i < RELAY_COUNT; ++i)
@@ -145,6 +161,14 @@ void setup() {
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);  // disable brownout — WiFi init spikes current
     Serial.begin(115200);
     delay(500);
+
+    for (uint8_t i = 0; i < RELAY_COUNT; ++i) {
+        pinMode(DETECT_PINS[i], OUTPUT);
+        digitalWrite(DETECT_PINS[i], HIGH);
+    }
+
+    pinMode(DOWNSTREAM_PRESENCE_PIN, INPUT_PULLDOWN);
+    statusLed.begin();
 
     tft.init();
     tft.setRotation(1);  // landscape for splash (matches module orientation)
@@ -243,9 +267,16 @@ void setup() {
 
     // ── Sequencer fire callback ───────────────────────────────────────────────
     sequencer.onFire([](int id) {
-        Serial.printf("[App] Fire top id=%d\n", id);
+        Serial.printf("[App] Fire shot id=%d\n", id);
         tft.drawString("fire " + String(id), 320/2, 120);
-        // TODO: trigger relay via I2C GPIO extender
+        for (uint8_t i = 0; i < RELAY_COUNT; ++i) {
+            if (relayView.button(i).shotNumber() == id) {
+                Serial.printf("[App] Relay %u triggered (GPIO %u)\n", i + 1, DETECT_PINS[i]);
+                digitalWrite(DETECT_PINS[i], LOW);
+                delay(500); // enregistré le temps dans une variable
+                digitalWrite(DETECT_PINS[i], HIGH);
+            }
+        }
     });
 
     master.begin();
@@ -266,6 +297,8 @@ void setup() {
 void loop() {
     master.update();
     espNow.update();
+    checkDownstream();
+    statusLed.update();
 
     if (currentState == State::Preparation) {
         checkIgniters();
