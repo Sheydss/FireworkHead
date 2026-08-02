@@ -8,12 +8,12 @@
 #define ILI9488_DRIVER
 
 // ── SPI pins ─────────────────────────────────────────────────────────────────
-#define TFT_MOSI  47
-#define TFT_SCLK  48
-#define TFT_MISO   3
-#define TFT_CS     6
-#define TFT_DC     7
-#define TFT_RST   40
+#define TFT_MOSI  11
+#define TFT_SCLK  12
+#define TFT_MISO  13
+#define TFT_CS    10
+#define TFT_DC     9
+#define TFT_RST   14
 
 // ── Touch controller (XPT2046) ────────────────────────────────────────────────
 #define TOUCH_CS   4
@@ -30,6 +30,6 @@
 #define SMOOTH_FONT
 
 // ── SPI speed ─────────────────────────────────────────────────────────────────
-#define SPI_FREQUENCY       40000000
-#define SPI_READ_FREQUENCY  20000000
-#define SPI_TOUCH_FREQUENCY  2500000
+#define SPI_FREQUENCY        10000000   // ILI9488 max write = 15.15 MHz; 10 MHz for reliability
+#define SPI_READ_FREQUENCY    6000000   // ILI9488 max read  = 6.67 MHz
+#define SPI_TOUCH_FREQUENCY   2500000

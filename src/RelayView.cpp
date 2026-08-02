@@ -34,13 +34,7 @@ RelayView::RelayView(TFT_eSPI& tft)
 
 void RelayView::begin()
 {
-    m_tft.init();
     m_tft.setRotation(0);
-
-    // Calibrate touch without drawing the keypad UI — avoids the flash
-    // that would occur if begin() drew the keypad before drawMainView()
-    m_keypad.calibrateOnly();
-
     drawMainView();
 }
 

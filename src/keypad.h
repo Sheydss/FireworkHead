@@ -5,7 +5,7 @@
 #include <FS.h>
 
 #define CALIBRATION_FILE "/TouchCalV0"
-#define REPEAT_CAL       false
+#define REPEAT_CAL       true
 
 // Screen — portrait 320×480
 #define SCREEN_W   320

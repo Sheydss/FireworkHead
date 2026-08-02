@@ -181,7 +181,6 @@ bool Keypad::getConfirmedValue(int& value) {
 void Keypad::_touchCalibrate() {
   uint16_t calData[5];
   uint8_t  calDataOK = 0;
-  if (!LittleFS.begin()) { LittleFS.format(); LittleFS.begin(); }
   if (LittleFS.exists(CALIBRATION_FILE)) {
     if (REPEAT_CAL) { LittleFS.remove(CALIBRATION_FILE); }
     else {
@@ -199,7 +198,7 @@ void Keypad::_touchCalibrate() {
     _tft.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
     _tft.setTextColor(TFT_GREEN, TFT_BLACK);
     _tft.println("Done!");
-    fs::File f = LittleFS.open(CALIBRATION_FILE, "w");
+    fs::File f = LittleFS.open(CALIBRATION_FILE, "w", true);
     if (f) { f.write((const unsigned char*)calData, 14); f.close(); }
     delay(600);
   }
