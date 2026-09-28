@@ -176,7 +176,8 @@ bool RelayView::loadConfig(const char* path)
     {
         uint8_t idx  = o["i"] | 255u;
         int     shot = o["s"] | 0;
-        if (idx < RELAY_COUNT && shot > 0)
+        if (idx < RELAY_COUNT && shot > 0
+            && m_buttons[idx].state() != RelayState::DISCONNECTED)
         {
             m_buttons[idx].setAssigned(m_tft, shot);
             Serial.printf("[Config] Relay %u → shot %d\n", idx + 1, shot);

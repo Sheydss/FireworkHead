@@ -33,6 +33,17 @@ static constexpr uint8_t DETECT_PINS[RELAY_COUNT] = { 1, 2 };
 static bool s_lastConnected[RELAY_COUNT]          = {};
 static bool s_pendingConfigLoad                   = false;
 
+// CD74HC4067 MUX — igniter presence detection
+// NOTE: MUX_EN shares GPIO 4 with TOUCH_CS; disconnect touch if both are in use.
+static constexpr uint8_t MUX_EN  = 4;  // active LOW
+static constexpr uint8_t MUX_S_COUNT = 4; 
+static constexpr uint8_t MUX_S[MUX_S_COUNT]  = {42, 2, 7, 6};  // channel select bit 0
+static constexpr uint8_t MUX_SIG = 5;  // signal read pin (INPUT_PULLUP)
+
+struct PendingDeact { uint8_t pin; uint32_t offAt; };
+static PendingDeact s_pendingDeact[RELAY_COUNT];
+static uint8_t      s_pendingDeactCount = 0;
+
 static constexpr uint8_t DOWNSTREAM_PRESENCE_PIN = 16;
 static bool s_lastDownstream = false;
 
@@ -108,23 +119,42 @@ void checkDownstream()
         Serial.printf("[App] Downstream module %s\n", downstream ? "connected" : "disconnected");
     }
 }
+static int     s_muxLastRead[RELAY_COUNT]    = {};
+static uint8_t s_muxStableCount[RELAY_COUNT] = {};
 
 void checkIgniters()
 {
     for (uint8_t i = 0; i < RELAY_COUNT; ++i)
     {
-        // TODO: replace with digitalRead(DETECT_PINS[i]) == HIGH
-        // when real hardware detection is ready
-        const bool connected = (i == 0 || i == 1); // ← relay 0 always connected for testing
+        // Disable MUX before changing select pins to avoid glitches on SIG
+        digitalWrite(MUX_EN, HIGH);
+        for (uint8_t b = 0; b < MUX_S_COUNT; ++b)
+            digitalWrite(MUX_S[b], (i >> b) & 1 ? HIGH : LOW);
+        digitalWrite(MUX_EN, LOW);
+
+        delay(100); // let SIG fully settle before reading
+        const int valueRead = analogRead(MUX_SIG);
+
+        if(i == 3 || i == 2 || i == 4) 
+            Serial.printf("[MUX] ch%u = %d\n", i, valueRead);
+
+        if (valueRead != s_muxLastRead[i]) { // to change
+            s_muxLastRead[i]    = valueRead;
+            s_muxStableCount[i] = 1;
+        } else if (s_muxStableCount[i] < 5) {
+            s_muxStableCount[i]++;
+        }
+
+        const bool connected = (valueRead > 100); //s_muxStableCount[i] >= 5 && 
 
         if (connected != s_lastConnected[i])
         {
             s_lastConnected[i] = connected;
             relayView.setConnected(i, connected);
- 
-            Serial.printf("[App] Relay %u igniter %s\n",
-                          i + 1, connected ? "connected" : "disconnected");
+            //Serial.printf("[App] Relay %u igniter %s\n",
+                          //i + 1, connected ? "connected" : "disconnected");
         }
+        digitalWrite(MUX_EN, HIGH); // disable after reading
     }
 }
 
@@ -166,6 +196,13 @@ void setup() {
         pinMode(DETECT_PINS[i], OUTPUT);
         digitalWrite(DETECT_PINS[i], HIGH);
     }
+
+    // MUX igniter detection pins
+    pinMode(MUX_EN,  OUTPUT); digitalWrite(MUX_EN, HIGH); // disabled at rest
+    for(int i = 0; i < MUX_S_COUNT; i++) {
+            pinMode(MUX_S[i],  OUTPUT); digitalWrite(MUX_S[i], LOW);
+    }
+    pinMode(MUX_SIG, INPUT_PULLUP);
 
     pinMode(DOWNSTREAM_PRESENCE_PIN, INPUT_PULLDOWN);
     statusLed.begin();
@@ -222,6 +259,10 @@ void setup() {
                 relayView.begin();
                 if (s_pendingConfigLoad)
                 {
+                    // Run enough detection cycles so every channel reaches a stable
+                    // count before loadConfig checks connection state.
+                    // stable threshold = 5, so 6 calls guarantees count >= 5.
+                    for (int w = 0; w < 6; ++w) checkIgniters();
                     relayView.loadConfig(RELAY_CONFIG_PATH);
                     s_pendingConfigLoad = false;
                 }
@@ -273,8 +314,8 @@ void setup() {
             if (relayView.button(i).shotNumber() == id) {
                 Serial.printf("[App] Relay %u triggered (GPIO %u)\n", i + 1, DETECT_PINS[i]);
                 digitalWrite(DETECT_PINS[i], LOW);
-                delay(500); // enregistré le temps dans une variable
-                digitalWrite(DETECT_PINS[i], HIGH);
+                if (s_pendingDeactCount < RELAY_COUNT)
+                    s_pendingDeact[s_pendingDeactCount++] = { DETECT_PINS[i], millis() + 500 };
             }
         }
     });
@@ -295,6 +336,19 @@ void setup() {
 }
 
 void loop() {
+    // Release relay pins whose 500 ms pulse has expired
+    {
+        const uint32_t now = millis();
+        uint8_t kept = 0;
+        for (uint8_t i = 0; i < s_pendingDeactCount; ++i) {
+            if (now >= s_pendingDeact[i].offAt)
+                digitalWrite(s_pendingDeact[i].pin, HIGH);
+            else
+                s_pendingDeact[kept++] = s_pendingDeact[i];
+        }
+        s_pendingDeactCount = kept;
+    }
+
     master.update();
     espNow.update();
     checkDownstream();
